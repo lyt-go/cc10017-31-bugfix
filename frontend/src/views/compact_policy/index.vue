@@ -56,6 +56,8 @@
       </tbody>
     </table>
 
+    <CompactManifestPanel mode="workbench" table="orders" />
+
     <div v-if="showCreate" class="modal-backdrop" data-testid="create-modal">
       <form class="modal" @submit.prevent="submitCreate">
         <h3>登记清理策略</h3>
@@ -83,6 +85,7 @@
 import { computed, onMounted, ref } from 'vue'
 
 import { request } from '@/api/client'
+import CompactManifestPanel from '@/components/CompactManifestPanel.vue'
 
 type Row = Record<string, string | number | null>
 

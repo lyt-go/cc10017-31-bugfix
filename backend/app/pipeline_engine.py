@@ -15,6 +15,7 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from app.store import store
+from app.services.compact_batch import compact_batch_service
 
 
 class PipelineEngine:
@@ -332,15 +333,18 @@ class PipelineEngine:
     # ───────────────────────────────
 
     def maintenance_chain_status(self, target_table: str) -> dict[str, Any]:
-        """查询维护链：补数→合并清理→生命周期。"""
+        """查询维护链：补数→合并清理→生命周期，并带上两份共同的合并批次清单。"""
         backfill = self._find_by_field("backfill_stream", "目标表名", target_table)
         compact = self._find_by_field("compact_policy", "目标表名", target_table)
         ttl = self._find_by_field("ttl_policy", "目标表名", target_table)
+        manifest = compact_batch_service.manifest(target_table)
 
         return {
             "backfill": {"exists": backfill is not None, "status": backfill.get("status") if backfill else None, "entry": backfill},
             "compact_policy": {"exists": compact is not None, "status": compact.get("status") if compact else None, "entry": compact},
             "ttl_policy": {"exists": ttl is not None, "status": ttl.get("status") if ttl else None, "entry": ttl},
+            "manifest": manifest,
+            "snapshot": manifest["snapshot"],
             "chain_ready": all([
                 backfill is not None and backfill.get("status") == "已完成",
                 compact is not None and compact.get("status") == "已生效",
@@ -349,7 +353,7 @@ class PipelineEngine:
         }
 
     def run_backfill_then_compact(self, backfill_id: int) -> dict[str, Any]:
-        """执行补数后触发合并清理：维护链联动。"""
+        """执行补数后触发合并清理：以合并批次清单为交接对象，重复执行不重复合并。"""
         backfill = store.find("backfill_stream", backfill_id)
         if not backfill:
             return {"ok": False, "error": f"补数任务 {backfill_id} 不存在"}
@@ -374,17 +378,54 @@ class PipelineEngine:
         backfill["status"] = "已完成"
         backfill["pending"] = False
 
-        # 触发合并产物
+        # 交接点：读清单。优先续做未完成批次，没有批次时才重新读取策略生成。
+        batches, messages = compact_batch_service.resume_table(target_table)
+        if not batches:
+            batches, generate_message = compact_batch_service.generate_batches(
+                target_table=target_table, policy_id=compact.get("id"))
+            messages.append(generate_message)
+            if batches:
+                batches, resumed_messages = compact_batch_service.resume_table(target_table)
+                messages.extend(resumed_messages)
+        if not batches:
+            # 已全部合并过：复用已有批次，绝不重新合并同一源文件集合。
+            existing_batches = compact_batch_service.batches_for(target_table)
+            if not existing_batches:
+                return {"ok": False, "error": messages[-1] if messages else "没有可合并的文件"}
+            batches = existing_batches
+            messages.append("已有批次全部完成，复用合并结果，不重复合并")
+
+        manifest = compact_batch_service.manifest(target_table)
+        merged_now = [
+            file for batch in batches for file in batch.get("merged_files", [])
+        ]
         compact_result = {
             "backfill_id": backfill_id,
             "target_table": target_table,
             "backfilled_count": backfilled_count,
             "compact_policy_id": compact.get("id"),
-            "merged_files": backfilled_count // 10 + 1,
+            "merged_files": len(compact_batch_service.snapshot(target_table)["target_files"]),
+            "merged_source_files": len(set(merged_now)),
+            "batch_nos": [batch.get("batch_no") for batch in batches],
+            "manifest_version": manifest["version"],
+            "manifest_bookmark": manifest["bookmark"],
+            "snapshot_file_count": manifest["snapshot"]["snapshot_file_count"],
+            "duplicate_count": manifest["snapshot"]["duplicate_count"],
             "compacted_at": datetime.now().isoformat(),
+            "messages": messages,
         }
         self._ensure_artifact_table("compact_results")
-        store.rows("compact_results").append(compact_result)
+        compact_results = store.rows("compact_results")
+        # 同一补数任务同一批次只留一条产物，重跑只更新而不追加。
+        existing = next(
+            (row for row in compact_results
+             if row.get("backfill_id") == backfill_id and row.get("batch_nos") == compact_result["batch_nos"]),
+            None,
+        )
+        if existing is None:
+            compact_results.append(compact_result)
+        else:
+            existing.update(compact_result)
 
         # 检查生命周期策略
         ttl = self._find_by_field("ttl_policy", "目标表名", target_table)
@@ -397,12 +438,15 @@ class PipelineEngine:
                 "applied_at": datetime.now().isoformat(),
             }
             self._ensure_artifact_table("ttl_applied_log")
-            store.rows("ttl_applied_log").append(ttl_record)
+            ttl_rows = store.rows("ttl_applied_log")
+            if not any(row.get("table") == target_table for row in ttl_rows):
+                ttl_rows.append(ttl_record)
             compact_result["ttl_applied"] = ttl_record
         else:
             compact_result["ttl_applied"] = None
 
-        return {"ok": True, "result": compact_result}
+        return {"ok": True, "result": compact_result, "manifest": manifest}
+
 
     # ───────────────────────────────
     # 实时指标链

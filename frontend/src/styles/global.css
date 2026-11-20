@@ -70,3 +70,27 @@ body { margin: 0; background: #f6f8fb; color: #1f2937; }
 .analysis-chart { display: flex; align-items: flex-end; gap: 8px; height: 160px; padding: 12px 0; }
 .analysis-bar { flex: 1; border-radius: 4px 4px 0 0; background: var(--brand); min-width: 24px; position: relative; transition: height 0.4s; }
 .analysis-bar span { position: absolute; bottom: -20px; left: 50%; transform: translateX(-50%); font-size: 10px; color: var(--muted); white-space: nowrap; }
+/* 合并批次清单 */
+.manifest-panel { background: #fff; border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; margin: 16px 0; }
+.manifest-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+.manifest-head h3 { margin: 0; font-size: 15px; }
+.manifest-desc { color: var(--muted); font-size: 12px; margin: 4px 0 0; max-width: 760px; }
+.manifest-target { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); }
+.manifest-target select { padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; }
+.manifest-message { font-size: 12px; color: #0f766e; margin: 8px 0 0; }
+.manifest-meta { display: flex; flex-wrap: wrap; gap: 16px; margin: 10px 0; font-size: 12px; color: var(--muted); }
+.manifest-meta code { font-family: monospace; color: #1f2937; }
+.manifest-actions { margin-bottom: 10px; }
+.manifest-table td.manifest-file { font-family: monospace; font-size: 12px; word-break: break-all; }
+.manifest-table .link:disabled { color: var(--muted); cursor: not-allowed; }
+.intake-box { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+.intake-box label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); flex: 1; min-width: 260px; }
+.intake-box input { padding: 7px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; font-family: monospace; }
+.intake-decision { font-size: 12px; color: var(--muted); }
+.intake-queue { margin-top: 10px; font-size: 12px; color: var(--muted); }
+.intake-queue ul { margin: 6px 0 0; padding-left: 18px; }
+.intake-queue li { font-family: monospace; font-size: 12px; }
+.conflict-box { margin-top: 10px; padding: 10px 12px; background: #f8fafc; border: 1px dashed var(--border); border-radius: 8px; font-size: 12px; color: var(--muted); }
+.conflict-box strong { color: #1f2937; }
+.conflict-box p { margin: 4px 0; }
+.conflict-box ul { margin: 6px 0 0; padding-left: 18px; }

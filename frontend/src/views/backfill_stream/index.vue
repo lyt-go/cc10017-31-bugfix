@@ -26,6 +26,7 @@
       <strong>{{ selectedItem.name || selectedItem.label }}</strong> — 状态：{{ selectedItem.status }}
       <div style="margin-top:4px;">{{ selectedItem.logs || '暂无日志' }}</div>
     </div>
+    <CompactManifestPanel mode="intake" table="orders" />
     <div v-if="showCreate" class="modal-backdrop" data-testid="create-modal">
       <form class="modal" @submit.prevent="submitCreate"><h3>登记补数任务</h3>
         <label v-for="field in columns.slice(0,3)" :key="field" class="create-field"><span>{{ field }}</span><input v-model="createValues[field]" :placeholder="`请输入${field}`" required /></label>
@@ -40,6 +41,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { request } from '@/api/client'
+import CompactManifestPanel from '@/components/CompactManifestPanel.vue'
 const ENDPOINT = '/api/backfill_stream'
 const columns = ["任务编号", "目标表名", "起始偏移", "截止偏移", "重放速率", "并行度", "覆盖策略", "结果校验"]
 const actions = ["启动补数", "确认完成", "取消补数"]
